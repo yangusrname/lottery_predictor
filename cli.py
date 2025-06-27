@@ -174,18 +174,22 @@ def predict(args):
         
         predictions = predictor.predict_ensemble(cleaned_data, feature_engineer, model_paths)
     else:
-        # 单模型预测
-        model_path = Path(f"models/{args.model}_model.pth")
-        if not model_path.exists():
-            # 尝试旧版本的模型文件
-            model_path = Path(f"models/{args.model}_model.pkl")
-        
-        if not model_path.exists():
-            print("错误：找不到训练好的模型文件")
-            return
-        
-        predictor.load_model(str(model_path))
-        predictions = predictor.predict_next(cleaned_data, feature_engineer)
+        try:
+            # 单模型预测
+            model_path = Path(f"models/{args.model}_model.pth")
+            if not model_path.exists():
+                # 尝试旧版本的模型文件
+                model_path = Path(f"models/{args.model}_model.pkl")
+            
+            if not model_path.exists():
+                print("错误：找不到训练好的模型文件")
+                return
+            
+            predictor.load_model(str(model_path))
+            predictions = predictor.predict_next(cleaned_data, feature_engineer)
+        except Exception as e:
+            import traceback
+            traceback.print_exc()
     
     # 输出结果
     print("\n预测结果:")

@@ -604,6 +604,25 @@ class ModelTrainer:
         output_path = Path(filepath)
         output_path.parent.mkdir(parents=True, exist_ok=True)
         
+        # 修复 input_size 保存逻辑
+        input_size = None
+        from torch.nn import Linear, LSTM, GRU, Sequential, Conv1d, Module
+        if self.model_type == 'transformer' and hasattr(self.model, 'input_embedding') and isinstance(self.model.input_embedding, Linear):
+            input_size = self.model.input_embedding.in_features
+        elif self.model_type == 'lstm' and hasattr(self.model, 'lstm') and isinstance(self.model.lstm, LSTM):
+            input_size = self.model.lstm.input_size
+        elif self.model_type == 'gru' and hasattr(self.model, 'gru') and isinstance(self.model.gru, GRU):
+            input_size = self.model.gru.input_size
+        elif self.model_type == 'tcn' and hasattr(self.model, 'tcn') and isinstance(self.model.tcn, Module):
+            tcn_network = getattr(self.model.tcn, 'network', None)
+            if tcn_network is not None and isinstance(tcn_network, Sequential):
+                network_layers = list(tcn_network.children())
+                if len(network_layers) > 0:
+                    first_block = network_layers[0]
+                    conv1 = getattr(first_block, 'conv1', None)
+                    if conv1 is not None and isinstance(conv1, Conv1d):
+                        input_size = conv1.in_channels
+        
         # 保存模型状态
         save_dict = {
             'model_state_dict': self.model.state_dict(),
@@ -611,7 +630,7 @@ class ModelTrainer:
             'model_params': self.model_params,
             'training_history': self.training_history,
             'sequence_length': self.sequence_length,
-            'input_size': list(self.model.parameters())[0].shape[1] if hasattr(self.model, 'lstm') else None
+            'input_size': input_size
         }
         
         torch.save(save_dict, output_path)
@@ -622,7 +641,8 @@ class ModelTrainer:
             'model_type': self.model_type,
             'model_params': self.model_params,
             'training_history': self.training_history,
-            'sequence_length': self.sequence_length
+            'sequence_length': self.sequence_length,
+            'input_size': input_size
         }
         
         with open(meta_path, 'w', encoding='utf-8') as f:
@@ -651,7 +671,15 @@ class ModelTrainer:
         self.sequence_length = checkpoint.get('sequence_length', 30)
         
         # 创建模型结构
-        input_size = checkpoint.get('input_size', 82)  # 默认输入大小
+        input_size = checkpoint.get('input_size')
+        if input_size is None:
+            # 尝试从config或model_params获取
+            input_size = self.config['model'].get('input_size') if hasattr(self, 'config') and 'model' in self.config and 'input_size' in self.config['model'] else None
+            if input_size is None:
+                # 尝试从model_params
+                input_size = self.model_params.get('input_size')
+        if input_size is None:
+            raise ValueError("无法确定模型的 input_size，请检查模型保存和加载流程。")
         self.model = self._create_model(input_size)
         
         # 加载模型权重

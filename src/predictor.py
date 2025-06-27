@@ -55,7 +55,14 @@ class Predictor:
             # 重新创建模型结构
             from src.model_trainer import LSTMModel, GRUModel, TransformerModel, TCNModel
             
-            input_size = checkpoint.get('input_size', 82)
+            input_size = checkpoint.get('input_size')
+            if input_size is None:
+                # 尝试从config或model_params获取
+                input_size = self.config['model'].get('input_size') if hasattr(self, 'config') and 'model' in self.config and 'input_size' in self.config['model'] else None
+                if input_size is None:
+                    input_size = model_params.get('input_size')
+                if input_size is None:
+                    raise ValueError("无法确定TCN模型的input_size，请重新训练模型或检查模型保存流程。")
             
             if self.model_type == 'lstm':
                 self.model = LSTMModel(

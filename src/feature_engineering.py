@@ -11,6 +11,9 @@ from collections import Counter
 import logging
 from typing import Dict, Any, Tuple, List
 from datetime import datetime
+import concurrent.futures
+import multiprocessing
+from joblib import Parallel, delayed
 
 logger = logging.getLogger(__name__)
 
@@ -39,37 +42,23 @@ class FeatureEngineer:
         Returns:
             (features, labels) 特征和标签数组
         """
-        logger.info("开始时序特征提取...")
-        
-        features_list = []
-        
-        for idx in range(len(data)):
+        logger.info("开始时序特征提取... (多进程)")
+        n_jobs = multiprocessing.cpu_count()
+
+        def extract_row(idx):
             row_features = []
-            
-            # 1. 当前期号码特征
             if 'numbers' in data.columns:
-                number_features = self._extract_number_features_single(data.iloc[idx])
-                row_features.extend(number_features)
-            
-            # 2. 历史统计特征（基于滑动窗口）
-            hist_features = self._extract_historical_features(data, idx)
-            row_features.extend(hist_features)
-            
-            # 3. 时间特征
+                row_features.extend(self._extract_number_features_single(data.iloc[idx]))
+            row_features.extend(self._extract_historical_features(data, idx))
             if 'date' in data.columns:
-                time_features = self._extract_time_features_single(data.iloc[idx])
-                row_features.extend(time_features)
-            
-            # 4. 趋势特征
-            trend_features = self._extract_trend_features(data, idx)
-            row_features.extend(trend_features)
-            
-            # 5. 周期性特征
-            cycle_features = self._extract_cycle_features(data, idx)
-            row_features.extend(cycle_features)
-            
-            features_list.append(row_features)
-        
+                row_features.extend(self._extract_time_features_single(data.iloc[idx]))
+            row_features.extend(self._extract_trend_features(data, idx))
+            row_features.extend(self._extract_cycle_features(data, idx))
+            return row_features
+
+        features_list = Parallel(n_jobs=n_jobs)(
+            delayed(extract_row)(idx) for idx in range(len(data))
+        )
         features = np.array(features_list)
         
         # 准备标签（预测下一期的号码）
@@ -100,7 +89,7 @@ class FeatureEngineer:
         features = []
         
         if pd.isna(row.get('numbers', '')):
-            return [0] * 60  # 返回默认特征
+            return [0.0] * 60  # 返回默认特征
         
         numbers_str = str(row['numbers'])
         
@@ -153,11 +142,11 @@ class FeatureEngineer:
                 features.append(consecutive_count / 5)  # 最多5个连号
                 
             else:
-                features = [0] * 60
+                features = [0.0] * 60
                 
         except Exception as e:
             logger.warning(f"处理号码特征时出错: {str(e)}")
-            features = [0] * 60
+            features = [0.0] * 60
         
         return features
     
@@ -228,7 +217,7 @@ class FeatureEngineer:
                 
             else:
                 # 如果没有历史数据，使用默认值
-                features.extend([0] * 51)
+                features.extend([0.0] * 51)
         
         return features
     
@@ -277,9 +266,9 @@ class FeatureEngineer:
                 ])
                 
             except:
-                features = [0] * 11
+                features = [0.0] * 11
         else:
-            features = [0] * 11
+            features = [0.0] * 11
         
         return features
     
@@ -329,9 +318,9 @@ class FeatureEngineer:
                     change_rate = (sums[-1] - sums[0]) / (sums[0] + 1e-6)
                     features.append(np.tanh(change_rate))  # 使用tanh限制范围
                 else:
-                    features.extend([0, 0])
+                    features.extend([0.0, 0.0])
             else:
-                features.extend([0, 0])
+                features.extend([0.0, 0.0])
         
         return features
     
@@ -381,7 +370,7 @@ class FeatureEngineer:
                     cycle_score = np.exp(-abs(last_appearance - avg_interval) / (avg_interval + 1))
                     period_features.append(cycle_score)
                 else:
-                    period_features.append(0)
+                    period_features.append(0.0)
             
             # 取前10个最有周期性的号码特征
             top_cycle_scores = sorted(period_features, reverse=True)[:10]
@@ -390,7 +379,7 @@ class FeatureEngineer:
             # 平均周期性得分
             features.append(np.mean(period_features))
         else:
-            features = [0] * 11
+            features = [0.0] * 11
         
         return features
     

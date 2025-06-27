@@ -39,9 +39,9 @@ data:
   source: data/raw/lottery.csv
   
   # 数据集划分比例
-  train_ratio: 0.7
-  val_ratio: 0.15
-  test_ratio: 0.15
+  train_ratio: 0.9
+  val_ratio: 0.05
+  test_ratio: 0.05
   
   # 特征工程参数
   feature_engineering:
