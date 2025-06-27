@@ -88,7 +88,8 @@ def train(args):
     model_trainer.train(train_data, val_data)
     
     # 保存模型
-    model_path = Path(f"models/{config['model']['type']}_model.pkl")
+    model_extension = '.pth' if config['model']['type'] in ['lstm', 'gru', 'transformer', 'tcn'] else '.pkl'
+    model_path = Path(f"models/{config['model']['type']}_model{model_extension}")
     model_path.parent.mkdir(parents=True, exist_ok=True)
     model_trainer.save_model(str(model_path))
     
@@ -99,8 +100,12 @@ def evaluate(args):
     config = load_config(args.config)
     
     # 加载模型
-    model_path = Path(f"models/{args.model}_model.pkl") if args.model else None
-    if not model_path or not model_path.exists():
+    model_path = Path(f"models/{args.model}_model.pth")
+    if not model_path.exists():
+        # 尝试旧版本的模型文件
+        model_path = Path(f"models/{args.model}_model.pkl")
+    
+    if not model_path.exists():
         print("错误：找不到训练好的模型文件")
         return
     
@@ -136,15 +141,8 @@ def predict(args):
     """执行预测并输出结果"""
     config = load_config(args.config)
     
-    # 加载模型
-    model_path = Path(f"models/{args.model}_model.pkl") if args.model else None
-    if not model_path or not model_path.exists():
-        print("错误：找不到训练好的模型文件")
-        return
-    
     # 初始化预测器
     predictor = Predictor(config)
-    predictor.load_model(str(model_path))
     
     # 加载历史数据用于特征提取
     data_manager = DataManager(config)
@@ -159,7 +157,35 @@ def predict(args):
     
     # 进行预测
     print("正在预测下一期号码...")
-    predictions = predictor.predict_next(cleaned_data, feature_engineer)
+    
+    if args.ensemble:
+        # 集成预测
+        model_types = ['lstm', 'gru', 'transformer']
+        model_paths = []
+        
+        for model_type in model_types:
+            model_path = Path(f"models/{model_type}_model.pth")
+            if model_path.exists():
+                model_paths.append(str(model_path))
+        
+        if len(model_paths) < 2:
+            print("错误：集成预测需要至少2个已训练的模型")
+            return
+        
+        predictions = predictor.predict_ensemble(cleaned_data, feature_engineer, model_paths)
+    else:
+        # 单模型预测
+        model_path = Path(f"models/{args.model}_model.pth")
+        if not model_path.exists():
+            # 尝试旧版本的模型文件
+            model_path = Path(f"models/{args.model}_model.pkl")
+        
+        if not model_path.exists():
+            print("错误：找不到训练好的模型文件")
+            return
+        
+        predictor.load_model(str(model_path))
+        predictions = predictor.predict_next(cleaned_data, feature_engineer)
     
     # 输出结果
     print("\n预测结果:")
@@ -204,23 +230,25 @@ def main():
     # train 命令
     parser_train = subparsers.add_parser('train', help='开始模型训练')
     parser_train.add_argument('--model', 
-                            choices=['randomforest', 'xgboost', 'lightgbm', 'mlp', 'lstm'],
-                            help='模型类型')
+                            choices=['lstm', 'gru', 'transformer', 'tcn'],
+                            help='模型类型（默认使用配置文件中的设置）')
     parser_train.set_defaults(func=train)
     
     # evaluate 命令
     parser_eval = subparsers.add_parser('evaluate', help='运行模型评估')
     parser_eval.add_argument('--model', required=True,
-                           choices=['randomforest', 'xgboost', 'lightgbm', 'mlp', 'lstm'],
+                           choices=['lstm', 'gru', 'transformer', 'tcn'],
                            help='要评估的模型类型')
     parser_eval.set_defaults(func=evaluate)
     
     # predict 命令
     parser_predict = subparsers.add_parser('predict', help='执行预测并输出结果')
     parser_predict.add_argument('--model', required=True,
-                              choices=['randomforest', 'xgboost', 'lightgbm', 'mlp', 'lstm'],
+                              choices=['lstm', 'gru', 'transformer', 'tcn'],
                               help='用于预测的模型类型')
     parser_predict.add_argument('--output', help='输出文件路径 (可选)')
+    parser_predict.add_argument('--ensemble', action='store_true',
+                              help='使用集成预测（需要多个已训练的模型）')
     parser_predict.set_defaults(func=predict)
     
     # 解析参数

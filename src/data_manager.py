@@ -160,9 +160,9 @@ class DataManager:
             (train_data, val_data, test_data) 每个都是 (features, labels) 元组
         """
         # 获取切分比例
-        train_ratio = self.config['data'].get('train_ratio', 0.7)
-        val_ratio = self.config['data'].get('val_ratio', 0.15)
-        test_ratio = self.config['data'].get('test_ratio', 0.15)
+        train_ratio = self.config['data'].get('train_ratio', 0.99)
+        val_ratio = self.config['data'].get('val_ratio', 0.005)
+        test_ratio = self.config['data'].get('test_ratio', 0.005)
         
         # 确保比例和为1
         assert abs(train_ratio + val_ratio + test_ratio - 1.0) < 1e-6, "数据集切分比例之和必须为1"

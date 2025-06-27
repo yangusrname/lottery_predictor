@@ -1,0 +1,197 @@
+# 中国福利彩票预测工具配置文件 - 时序模型版本
+
+# 模型配置
+model:
+  # 模型类型: lstm, gru, transformer, tcn
+  type: lstm
+  
+  # 序列长度（使用多少期历史数据）
+  sequence_length: 30
+  
+  # LSTM/GRU参数
+  params:
+    # 网络结构
+    hidden_size: 256
+    num_layers: 3
+    dropout: 0.2
+    bidirectional: true  # 双向LSTM
+    
+    # 训练参数
+    batch_size: 32
+    epochs: 100
+    learning_rate: 0.001
+    weight_decay: 0.00001
+    
+    # 早停设置
+    patience: 10
+    
+    # Transformer专用参数
+    d_model: 512
+    nhead: 8
+    
+    # TCN专用参数
+    num_channels: [64, 128, 256]
+    kernel_size: 3
+
+# 数据配置
+data:
+  # 数据源文件路径
+  source: data/raw/lottery.csv
+  
+  # 数据集划分比例
+  train_ratio: 0.7
+  val_ratio: 0.15
+  test_ratio: 0.15
+  
+  # 特征工程参数
+  feature_engineering:
+    # 统计窗口大小（用于计算冷热号等）
+    window_sizes: [10, 20, 30, 50]
+    # 是否使用时间特征
+    use_time_features: true
+    # 是否使用统计特征
+    use_statistical_features: true
+    # 是否使用趋势特征
+    use_trend_features: true
+    # 是否使用周期性特征
+    use_cycle_features: true
+
+# 训练配置
+training:
+  # 使用GPU（如果可用）
+  use_gpu: true
+  
+  # 随机种子
+  random_seed: 42
+  
+  # 梯度裁剪
+  gradient_clip: 1.0
+  
+  # 学习率调度
+  lr_scheduler:
+    type: ReduceLROnPlateau
+    factor: 0.5
+    patience: 5
+    min_lr: 0.00001
+
+# 预测配置
+prediction:
+  # 使用最近多少期数据进行预测
+  recent_periods: 100
+  
+  # 批量预测时生成的组数
+  batch_size: 5
+  
+  # 是否显示置信度
+  show_confidence: true
+  
+  # 是否显示备选号码
+  show_alternatives: true
+  
+  # 概率阈值
+  probability_threshold: 0.5
+  
+  # Top-K采样
+  top_k: 10
+
+# 评估配置
+evaluation:
+  # 交叉验证折数
+  cv_folds: 5
+  
+  # 评估指标
+  metrics:
+    - accuracy
+    - precision
+    - recall
+    - f1_score
+    - exact_match
+    - partial_match
+  
+  # 是否生成详细报告
+  generate_report: true
+  
+  # 是否保存预测结果
+  save_predictions: true
+
+# 日志配置
+logging:
+  # 日志级别: DEBUG, INFO, WARNING, ERROR
+  level: INFO
+  
+  # 日志格式
+  format: '%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+  
+  # 是否保存到文件
+  save_to_file: true
+  
+  # 日志文件路径
+  log_file: logs/lottery_predictor.log
+  
+  # TensorBoard日志目录
+  tensorboard_dir: logs/tensorboard
+
+# 系统配置
+system:
+  # CPU核心数（-1表示使用所有可用核心）
+  n_jobs: -1
+  
+  # 内存限制（GB，0表示不限制）
+  memory_limit: 0
+  
+  # 是否显示进度条
+  show_progress: true
+  
+  # 检查点保存间隔（epochs）
+  checkpoint_interval: 10
+
+# 高级模型配置
+advanced_models:
+  # LSTM变体
+  lstm_variants:
+    - name: "BiLSTM-Attention"
+      config:
+        bidirectional: true
+        attention: true
+        num_heads: 8
+    
+    - name: "Stacked-LSTM"
+      config:
+        num_layers: 5
+        hidden_sizes: [512, 256, 128, 64, 32]
+  
+  # Transformer变体
+  transformer_variants:
+    - name: "Informer"
+      config:
+        prob_attention: true
+        distilling: true
+        
+    - name: "Autoformer"
+      config:
+        moving_avg: 25
+        decomposition: true
+  
+  # 集成学习
+  ensemble:
+    enabled: true
+    models: ["lstm", "gru", "transformer"]
+    voting: "soft"  # soft或hard投票
+    weights: [0.4, 0.3, 0.3]
+
+# 实验跟踪
+experiment:
+  # 实验名称
+  name: "lottery_prediction_v2"
+  
+  # 是否记录到MLflow
+  use_mlflow: false
+  
+  # 是否记录到Wandb
+  use_wandb: false
+  
+  # 保存最佳模型
+  save_best_only: true
+  
+  # 模型保存格式
+  save_format: "pytorch"  # pytorch或onnx
