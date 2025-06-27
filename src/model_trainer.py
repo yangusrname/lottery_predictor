@@ -437,8 +437,8 @@ class ModelTrainer:
         
         # 学习率调度器
         scheduler = optim.lr_scheduler.ReduceLROnPlateau(
-            optimizer, mode='min', factor=0.5, patience=5, verbose=True
-        )
+            optimizer, mode='min', factor=0.5, patience=5
+        ) # , verbose=True
         
         # 训练循环
         epochs = self.model_params.get('epochs', 100)
